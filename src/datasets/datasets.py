@@ -9,14 +9,11 @@ import os
 from os.path import join
 import pickle as pkl
 import requests
-import os
 
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 import zipfile
 import io
 import gdown
-
-import requests
 
 
 def feature_norm(self, features):

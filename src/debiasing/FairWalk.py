@@ -8,24 +8,17 @@ from tqdm import tqdm
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import f1_score, accuracy_score, roc_auc_score
 import random
-from tqdm import tqdm
 import torch
 
 import argparse
 import scipy.sparse as sp
-from tqdm import tqdm
 from typing import Optional, Tuple
-import numpy as np
-import torch
 from torch import Tensor
 from torch.nn import Embedding
 from torch.utils.data import DataLoader
 
 from torch_geometric.utils import sort_edge_index
 from torch_geometric.utils.num_nodes import maybe_num_nodes
-
-from torch_geometric.datasets import Planetoid
-
 
 # Training settings
 parser = argparse.ArgumentParser()
