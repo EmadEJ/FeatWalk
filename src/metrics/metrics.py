@@ -393,3 +393,108 @@ def individual_fairness_evaluation_cobo(adj, x, y_hat, y, sens, idx_test, top_k)
     GDIF = max(f_u1/f_u2, f_u2/f_u1)
     print(GDIF)
     print("\n")
+
+
+# ---- ADD THIS FUNCTION TO metrics/metrics.py ----
+import numpy as np
+import scipy.sparse as sp
+from sklearn.neighbors import NearestNeighbors
+
+def IF_cpu(adj_csr, X, y_hat, topk=20, metric="cosine"):
+    """
+    CPU-safe Individual Fairness (no .cuda()).
+
+    Parameters
+    ----------
+    adj_csr : scipy.sparse.csr_matrix
+        (Not strictly needed for IF_cpu; kept for signature parity. You can pass your graph adjacency.)
+    X : np.ndarray or torch.Tensor
+        Node features (n x d). If torch.Tensor, will be converted to numpy.
+    y_hat : np.ndarray or torch.Tensor
+        Predicted scores. Shape (n,) for binary scores or (n, C) for multi-class scores.
+        Prefer probabilities over hard labels.
+    topk : int
+        kNN size for the feature-similarity graph.
+    metric : str
+        'cosine' or a NearestNeighbors-compatible metric.
+
+    Returns
+    -------
+    float
+        IF value: lower = better (smoother predictions for similar nodes).
+    """
+    # Convert inputs
+    if hasattr(X, "detach"):
+        X = X.detach().cpu().numpy()
+    else:
+        X = np.asarray(X)
+    if hasattr(y_hat, "detach"):
+        y_hat = y_hat.detach().cpu().numpy()
+    else:
+        y_hat = np.asarray(y_hat)
+
+    n = X.shape[0]
+    if y_hat.ndim == 1:
+        Y = y_hat.reshape(n, 1)
+    else:
+        Y = y_hat  # (n, C)
+
+    # Build kNN similarity S (row-normalized), no dense n×n
+    k = min(topk + 1, n)  # +1 to include self, dropped below
+    # Normalize for cosine distance stability
+    if metric == "cosine":
+        norms = np.linalg.norm(X, axis=1, keepdims=True) + 1e-12
+        Xn = X / norms
+        nn = NearestNeighbors(n_neighbors=k, metric="cosine", algorithm="brute", n_jobs=-1)
+        nn.fit(Xn)
+        dists, idxs = nn.kneighbors(Xn, return_distance=True)
+        sims = 1.0 - dists  # cosine distance -> similarity
+    else:
+        nn = NearestNeighbors(n_neighbors=k, metric=metric, algorithm="brute", n_jobs=-1)
+        nn.fit(X)
+        dists, idxs = nn.kneighbors(X, return_distance=True)
+        # RBF-like similarity with auto bandwidth
+        flat = dists.ravel()
+        sigma = np.median(flat[flat > 0]) if np.any(flat > 0) else 1.0
+        sims = np.exp(-(dists ** 2) / (sigma ** 2 + 1e-12))
+
+    rows, cols, vals = [], [], []
+    for i in range(n):
+        for j, s in zip(idxs[i], sims[i]):
+            if j == i:
+                continue
+            rows.append(i); cols.append(j); vals.append(float(s))
+    S = sp.csr_matrix((vals, (rows, cols)), shape=(n, n))
+
+    # Keep exactly topk per row (robust to ties)
+    S = S.tolil()
+    for i in range(n):
+        row = S.rows[i]; data = S.data[i]
+        if not row:
+            continue
+        if len(row) > topk:
+            keep_idx = np.argpartition(data, -topk)[-topk:]
+            keep_set = set(row[j] for j in keep_idx)
+            S.rows[i] = [r for r in row if r in keep_set]
+            S.data[i] = [d for r, d in zip(row, data) if r in keep_set]
+    S = S.tocsr()
+
+    # Symmetrize (undirected similarity) and build Laplacian L = D - S_sym
+    S_sym = 0.5 * (S + S.T)
+    deg = np.array(S_sym.sum(1)).ravel()
+    L = sp.diags(deg, 0, shape=(n, n), format="csr") - S_sym
+
+    # Compute trace(Y^T L Y) = sum_c y_c^T L y_c (works for C=1 too)
+    IF_val = 0.0
+    if Y.ndim == 1 or Y.shape[1] == 1:
+        yv = Y.reshape(n)
+        Ly = L @ yv
+        IF_val = float(yv.T @ Ly)
+    else:
+        for c in range(Y.shape[1]):
+            yc = Y[:, c]
+            Ly = L @ yc
+            IF_val += float(yc.T @ Ly)
+
+    return IF_val
+# ---- END IF_cpu ----
