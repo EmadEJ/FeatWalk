@@ -47,5 +47,23 @@ def main():
     f1 = f1_score(y[idx_test], y_pred[idx_test], average='micro')
     print(f"Test Accuracy: {acc:.4f}, F1: {f1:.4f}")
 
+    from metrics.metrics import IF, GDIF
+    import torch
+
+    # Convert to torch for IF function
+    adj_torch = torch.tensor(adj.toarray()).to_sparse()
+    y_hat = torch.tensor(y_pred, dtype=torch.float32).unsqueeze(1)  # shape [n,1]
+    X_torch = torch.tensor(X, dtype=torch.float32)
+
+    # Individual fairness
+    if_val = IF(adj_torch, X_torch, y_hat)
+
+    # Group disparity in IF
+    gdif_val = GDIF(y_hat.detach().numpy(), data.sens())
+
+    print(f"IF (lower=better): {if_val:.4f}")
+    print(f"GDIF (closer to 1=better): {gdif_val:.4f}")
+
+
 if __name__ == "__main__":
     main()
