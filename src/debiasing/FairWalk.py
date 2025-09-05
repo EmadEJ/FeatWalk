@@ -16,6 +16,7 @@ from typing import Optional, Tuple
 from torch import Tensor
 from torch.nn import Embedding
 from torch.utils.data import DataLoader
+import gensim
 
 from torch_geometric.utils import sort_edge_index
 from torch_geometric.utils.num_nodes import maybe_num_nodes
@@ -353,7 +354,6 @@ class FairWalk:
         sampling_strategy: dict = None,
         quiet: bool = False,
         temp_folder: str = None,
-        epochs: int = 50,
     ):
         """
         Initiates the FairWalk object, precomputes walking probabilities and generates the walks.
@@ -371,14 +371,11 @@ class FairWalk:
         :param temp_folder: Path to folder with enough space to hold the memory map of self.d_graph (for big graphs); to be passed joblib.Parallel.temp_folder
         """
 
-        self.graph = nx.from_numpy_array(adj.to_dense().numpy())
-        n = len(self.graph.nodes())
-        node2group = {
-            node: group
-            for node, group in zip(
-                self.graph.nodes(), (5 * np.random.random(n)).astype(int)
-            )
-        }
+        self.graph = nx.from_numpy_array(adj.to_dense().cpu().numpy())        
+        
+        # This is a placeholder for group attributes since the dataset doesn't have them.
+        # FairWalk needs node groups to function. Here we assign random groups.
+        node2group = {i: s.item() for i, s in enumerate(sens)}
         nx.set_node_attributes(self.graph, node2group, "group")
 
         self.dimensions = dimensions
@@ -404,43 +401,49 @@ class FairWalk:
                         temp_folder
                     )
                 )
-
             self.temp_folder = temp_folder
             self.require = "sharedmem"
+            
+        self._precompute_probabilities()
+        self.walks = self._generate_walks()
+        
+        # Train Word2Vec and get embeddings
+        w2v_model = gensim.models.Word2Vec(self.walks, vector_size=self.dimensions, window=5, min_count=0, sg=1, hs=1, workers=workers)
+        
+        # Store embeddings in a sorted array
+        self.embs = np.zeros((adj.shape[0], self.dimensions))
+        for i in range(adj.shape[0]):
+            if str(i) in w2v_model.wv:
+                self.embs[i] = w2v_model.wv[str(i)]
+        
+        # from torch_geometric.utils import from_scipy_sparse_matrix
 
-        # self._precompute_probabilities()
-        # self.walks = self._generate_walks()
-        # self.embs=gensim.models.Word2Vec(self.walks,size=self.dimensions, window=5,min_count=0, sg=1,
-        #                                 hs=1).wv.vectors
-
-        from torch_geometric.utils import from_scipy_sparse_matrix
-
-        edge_index = from_scipy_sparse_matrix(sp.coo_matrix(adj.to_dense().numpy()))[0]
-        model = Node2Vec(
-            edge_index,
-            embedding_dim=128,
-            walk_length=walk_length,
-            context_size=10,
-            walks_per_node=num_walks,
-            num_negative_samples=1,
-            p=1,
-            q=1,
-            sparse=True,
-        ).to(device)
-        loader = model.loader(batch_size=128, shuffle=True, num_workers=4)
-        optimizer = torch.optim.SparseAdam(list(model.parameters()), lr=0.01)
-        model.train()
-        for epoch in tqdm(range(0, epochs)):
-            total_loss = 0
-            for pos_rw, neg_rw in loader:
-                optimizer.zero_grad()
-                loss = model.loss(pos_rw.to(device), neg_rw.to(device))
-                loss.backward()
-                optimizer.step()
-                total_loss += loss.item()
-        model.eval()
-        z = model()
-        self.embs = z.detach().cpu().numpy()
+        # edge_index = from_scipy_sparse_matrix(sp.coo_matrix(adj.to_dense().numpy()))[0]
+        # model = Node2Vec(
+        #     edge_index,
+        #     embedding_dim=128,
+        #     walk_length=walk_length,
+        #     context_size=10,
+        #     walks_per_node=num_walks,
+        #     num_negative_samples=1,
+        #     p=1,
+        #     q=1,
+        #     sparse=True,
+        # ).to(device)
+        # loader = model.loader(batch_size=128, shuffle=True, num_workers=4)
+        # optimizer = torch.optim.SparseAdam(list(model.parameters()), lr=0.01)
+        # model.train()
+        # for epoch in tqdm(range(0, epochs)):
+        #     total_loss = 0
+        #     for pos_rw, neg_rw in loader:
+        #         optimizer.zero_grad()
+        #         loss = model.loss(pos_rw.to(device), neg_rw.to(device))
+        #         loss.backward()
+        #         optimizer.step()
+        #         total_loss += loss.item()
+        # model.eval()
+        # z = model()
+        # self.embs = z.detach().cpu().numpy()
         #
         # self.embs=torch.nn.functional.normalize(torch.tensor(self.embs).float(),dim=-1)
 

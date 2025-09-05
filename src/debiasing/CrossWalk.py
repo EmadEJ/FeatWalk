@@ -552,7 +552,7 @@ class CrossWalk:
         print("Training...")
         model = Word2Vec(
             walks,
-            size=self.representation_size,
+            vector_size=self.representation_size,
             window=self.window_size,
             min_count=0,
             sg=1,
@@ -716,44 +716,43 @@ class CrossWalk:
         window_size=5,
         workers=5,
         pmodified=1.0,
-        epochs=50,
     ):
-        # self.embs=self.run(adj_matrix, number_walks, representation_size, seed, walk_length, window_size, workers, pmodified)
+        self.embs=self.run(adj_matrix, number_walks, representation_size, seed, walk_length, window_size, workers, pmodified)
 
-        from torch_geometric.utils import from_scipy_sparse_matrix
+        # from torch_geometric.utils import from_scipy_sparse_matrix
 
-        edge_index = from_scipy_sparse_matrix(
-            sp.coo_matrix(adj_matrix.to_dense().numpy())
-        )[0]
+        # edge_index = from_scipy_sparse_matrix(
+        #     sp.coo_matrix(adj_matrix.to_dense().numpy())
+        # )[0]
 
-        model = Node2Vec(
-            edge_index,
-            embedding_dim=128,
-            walk_length=walk_length,
-            context_size=10,
-            walks_per_node=number_walks,
-            num_negative_samples=1,
-            p=1,
-            q=1,
-            sparse=True,
-        ).to(device)
-        #
-        loader = model.loader(batch_size=128, shuffle=True, num_workers=4)
-        optimizer = torch.optim.SparseAdam(list(model.parameters()), lr=0.01)
+        # model = Node2Vec(
+        #     edge_index,
+        #     embedding_dim=128,
+        #     walk_length=walk_length,
+        #     context_size=10,
+        #     walks_per_node=number_walks,
+        #     num_negative_samples=1,
+        #     p=1,
+        #     q=1,
+        #     sparse=True,
+        # ).to(device)
+        # #
+        # loader = model.loader(batch_size=128, shuffle=True, num_workers=4)
+        # optimizer = torch.optim.SparseAdam(list(model.parameters()), lr=0.01)
 
-        model.train()
-        for epoch in tqdm(range(0, epochs)):
-            total_loss = 0
-            for pos_rw, neg_rw in loader:
-                optimizer.zero_grad()
-                loss = model.loss(pos_rw.to(device), neg_rw.to(device))
-                loss.backward()
-                optimizer.step()
-                total_loss += loss.item()
+        # model.train()
+        # for epoch in tqdm(range(0, epochs)):
+        #     total_loss = 0
+        #     for pos_rw, neg_rw in loader:
+        #         optimizer.zero_grad()
+        #         loss = model.loss(pos_rw.to(device), neg_rw.to(device))
+        #         loss.backward()
+        #         optimizer.step()
+        #         total_loss += loss.item()
 
-        z = model()
+        # z = model()
 
-        self.embs = z.detach().cpu().numpy()
+        # self.embs = z.detach().cpu().numpy()
 
         self.idx_train = idx_train
         # self.embs=np.concatenate([self.embs, feats.numpy()], -1)
