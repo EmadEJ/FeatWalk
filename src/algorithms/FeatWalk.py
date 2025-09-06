@@ -1,4 +1,4 @@
-# FeatWalk.py (Corrected)
+# FeatWalk.py 
 
 import torch
 import numpy as np
@@ -70,10 +70,8 @@ class FeatWalk:
             random_state=0, C=1.0, multi_class="auto", solver="lbfgs", max_iter=1000
         ).fit(self.embs[idx_train], labels[idx_train])
 
-    # --- THIS IS THE CORRECTED PART ---
     def fair_metric(self, pred, labels, sens):
         """A safe version of the fair_metric calculation."""
-        # Ensure inputs are numpy arrays for consistent operations
         if isinstance(labels, torch.Tensor):
             labels = labels.cpu().numpy()
         if isinstance(sens, torch.Tensor):
@@ -85,12 +83,10 @@ class FeatWalk:
         idx_s0_y1 = np.bitwise_and(idx_s0, labels == 1)
         idx_s1_y1 = np.bitwise_and(idx_s1, labels == 1)
 
-        # Safely calculate parity
         s0_out = sum(pred[idx_s0]) / sum(idx_s0) if sum(idx_s0) > 0 else 0
         s1_out = sum(pred[idx_s1]) / sum(idx_s1) if sum(idx_s1) > 0 else 0
         parity = abs(s0_out - s1_out)
 
-        # Safely calculate equal opportunity
         tpr_s0 = sum(pred[idx_s0_y1]) / sum(idx_s0_y1) if sum(idx_s0_y1) > 0 else 0
         tpr_s1 = sum(pred[idx_s1_y1]) / sum(idx_s1_y1) if sum(idx_s1_y1) > 0 else 0
         equality = abs(tpr_s0 - tpr_s1)

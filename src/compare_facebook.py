@@ -40,10 +40,10 @@ if __name__ == "__main__":
     setup_seed(42)
 
     # --- Hyperparameters for Consistency ---
-    NUM_WALKS = 40      # Increased for more stable embeddings
+    NUM_WALKS = 40 
     WALK_LENGTH = 20
     DIMS = 64
-    ALPHA = 1.0         # Using the best value from NBA tuning as a starting point
+    ALPHA = 1.0
 
     # 1. Load the Facebook dataset
     print("Loading Facebook dataset...")
