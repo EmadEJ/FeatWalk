@@ -50,7 +50,7 @@ pip install --upgrade pip
 pip install pandas
 
 # Install the project and its core dependencies
-pip install -e . -f [https://data.pyg.org/whl/torch-1.12.0%2Bcu116.html](https://data.pyg.org/whl/torch-1.12.0%2Bcu116.html) -f [https://download.pytorch.org/whl/torch_stable.html](https://download.pytorch.org/whl/torch_stable.html)  -f [https://data.dgl.ai/wheels/cu116/repo.html](https://data.dgl.ai/wheels/cu116/repo.html) -f [https://data.dgl.ai/wheels-test/repo.html](https://data.dgl.ai/wheels-test/repo.html)
+pip install -r requirements.txt
 ```
 
 ---
