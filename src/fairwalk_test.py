@@ -5,7 +5,7 @@ import numpy as np
 import random
 
 # 1. Import the FairWalk model and a small dataset
-from debiasing import FairWalk
+from algorithms import FairWalk
 from datasets import Nba
 
 # 2. Function to ensure reproducibility

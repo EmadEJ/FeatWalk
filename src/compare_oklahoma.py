@@ -1,4 +1,4 @@
-# compare_algorithms_bail.py
+# compare_oklahoma.py
 
 import torch
 import numpy as np
@@ -6,11 +6,11 @@ import random
 import pandas as pd
 from sklearn.metrics.pairwise import cosine_similarity
 
-# Import all three of your algorithms and the Bail dataset
+# Import all three of your algorithms and the Oklahoma dataset
 from algorithms.CrossWalk import CrossWalk
 from algorithms.FairWalk import FairWalk
 from algorithms.FeatWalk import FeatWalk
-from datasets import Bail
+from datasets import Oklahoma
 
 # -- Helper Functions --
 
@@ -39,28 +39,35 @@ def calculate_individual_fairness(embeddings, features):
 if __name__ == "__main__":
     setup_seed(42)
 
-    # 1. Load the Bail dataset
-    print("Loading Bail dataset...")
-    bail = Bail()
+    # --- Hyperparameters for Consistency ---
+    # Oklahoma is larger than Facebook, so we use fewer walks to keep runtime reasonable.
+    NUM_WALKS = 20
+    WALK_LENGTH = 20
+    DIMS = 64
+    ALPHA = 1.0
+
+    # 1. Load the Oklahoma dataset
+    print("Loading Oklahoma dataset...")
+    oklahoma = Oklahoma()
     adj, feats, idx_train, idx_val, idx_test, labels, sens = (
-        bail.adj(),
-        bail.features(),
-        bail.idx_train(),
-        bail.idx_val(),
-        bail.idx_test(),
-        bail.labels(),
-        bail.sens(),
+        oklahoma.adj(),
+        oklahoma.features(),
+        oklahoma.idx_train(),
+        oklahoma.idx_val(),
+        oklahoma.idx_test(),
+        oklahoma.labels(),
+        oklahoma.sens(),
     )
     feats_np = feats.cpu().numpy()
     print("Dataset loaded successfully.\n")
 
     results = []
-    
+
     # --- Run 1: CrossWalk (Baseline) ---
-    print("--- Running CrossWalk (Baseline) ---")
+    print(f"--- Running CrossWalk (num_walks={NUM_WALKS}) ---")
     crosswalk_model = CrossWalk()
     crosswalk_model.fit(adj_matrix=adj, feats=feats, labels=labels, idx_train=idx_train, sens=sens,
-                        representation_size=64, number_walks=10, walk_length=20)
+                        representation_size=DIMS, number_walks=NUM_WALKS, walk_length=WALK_LENGTH)
     (ACC, AUCROC, F1, _, _, _, _, _, _, SP, EO) = crosswalk_model.predict(idx_test, idx_val)
     if_score_cw = calculate_individual_fairness(crosswalk_model.embs, feats_np)
     results.append({
@@ -70,11 +77,10 @@ if __name__ == "__main__":
     print("--- CrossWalk Complete ---\n")
 
     # --- Run 2: FairWalk (Group Fairness Baseline) ---
-    print("--- Running FairWalk (Group Fairness) ---")
+    print(f"--- Running FairWalk (num_walks={NUM_WALKS}) ---")
     fairwalk_model = FairWalk()
-    # Using fewer walks to speed up the process on this larger graph
     fairwalk_model.fit(adj=adj, labels=labels, idx_train=idx_train, sens=sens,
-                       dimensions=64, num_walks=5, walk_length=20, workers=4)
+                       dimensions=DIMS, num_walks=NUM_WALKS, walk_length=WALK_LENGTH, workers=4)
     (ACC, AUCROC, F1, _, _, _, _, _, _, SP, EO) = fairwalk_model.predict(idx_test, idx_val)
     if_score_fw = calculate_individual_fairness(fairwalk_model.embs, feats_np)
     results.append({
@@ -84,11 +90,10 @@ if __name__ == "__main__":
     print("--- FairWalk Complete ---\n")
 
     # --- Run 3: FeatWalk (Individual Fairness) ---
-    print("--- Running FeatWalk (Individual Fairness) ---")
+    print(f"--- Running FeatWalk (num_walks={NUM_WALKS}) ---")
     featwalk_model = FeatWalk()
-    # Using fewer walks to speed up the process on this larger graph
     featwalk_model.fit(adj_matrix=adj, feats=feats, labels=labels, idx_train=idx_train, sens=sens,
-                       representation_size=64, number_walks=5, walk_length=20, alpha=5.0)
+                       representation_size=DIMS, number_walks=NUM_WALKS, walk_length=WALK_LENGTH, alpha=ALPHA)
     (ACC, AUCROC, F1, _, _, _, _, _, _, SP, EO) = featwalk_model.predict(idx_test)
     if_score_ftw = calculate_individual_fairness(featwalk_model.embs, feats_np)
     results.append({
@@ -99,16 +104,16 @@ if __name__ == "__main__":
 
     # --- 4. Final Comparison Summary ---
     print("==========================================================")
-    print("        Algorithm Comparison on Bail Dataset")
+    print("       Algorithm Comparison on Oklahoma Dataset")
     print("==========================================================")
     
-    # You may need to run 'pip install pandas' for this table.
     df = pd.DataFrame(results)
     df = df.set_index("Algorithm")
     
     pd.options.display.float_format = '{:.4f}'.format
     
     print(df)
-    print("\n* Individual Fairness Score: Lower is better.")
+    print("\n* WARNING: Accuracy scores are not meaningful due to random labels in this dataset.")
+    print("* Individual Fairness Score: Lower is better.")
     print("* SP and EO: Values closer to 0.0 are better.")
     print("==========================================================")

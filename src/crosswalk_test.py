@@ -6,7 +6,7 @@ import random
 
 # 1. Import the CrossWalk model and a dataset
 # Assuming CrossWalk.py is in the same directory or accessible in the python path.
-from debiasing import CrossWalk
+from algorithms import CrossWalk
 from datasets import Bail # We'll use the same dataset for a fair comparison.
 
 

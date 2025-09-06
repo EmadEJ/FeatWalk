@@ -1,15 +1,15 @@
-# compare_algorithms.py
+# compare_nba_stable.py
 
 import torch
 import numpy as np
 import random
-import pandas as pd # Used for the final comparison table
+import pandas as pd
 from sklearn.metrics.pairwise import cosine_similarity
 
 # Import all three of your algorithms and the dataset
-from debiasing.CrossWalk import CrossWalk
-from debiasing.FairWalk import FairWalk
-from debiasing.FeatWalk import FeatWalk
+from algorithms.CrossWalk import CrossWalk
+from algorithms.FairWalk import FairWalk
+from algorithms.FeatWalk import FeatWalk
 from datasets import Nba
 
 # -- Helper Functions --
@@ -38,6 +38,12 @@ def calculate_individual_fairness(embeddings, features):
 
 if __name__ == "__main__":
     setup_seed(42)
+    
+    # --- Hyperparameters for Consistency ---
+    NUM_WALKS = 40
+    WALK_LENGTH = 20
+    DIMS = 64
+    ALPHA = 1.0 # For FeatWalk
 
     # 1. Load the dataset once
     print("Loading Nba dataset...")
@@ -56,11 +62,11 @@ if __name__ == "__main__":
 
     results = []
 
-    # --- Run 1: CrossWalk (Corrected Baseline) ---
-    print("--- Running CrossWalk (Baseline) ---")
+    # --- Run 1: CrossWalk ---
+    print(f"--- Running CrossWalk (num_walks={NUM_WALKS}) ---")
     crosswalk_model = CrossWalk()
     crosswalk_model.fit(adj_matrix=adj, feats=feats, labels=labels, idx_train=idx_train, sens=sens,
-                        representation_size=64, number_walks=10, walk_length=20)
+                        representation_size=DIMS, number_walks=NUM_WALKS, walk_length=WALK_LENGTH)
     (ACC, AUCROC, F1, _, _, _, _, _, _, SP, EO) = crosswalk_model.predict(idx_test, idx_val)
     if_score = calculate_individual_fairness(crosswalk_model.embs, feats_np)
     results.append({
@@ -69,12 +75,11 @@ if __name__ == "__main__":
     })
     print("--- CrossWalk Complete ---\n")
 
-
-    # --- Run 2: FairWalk (Group Fairness Baseline) ---
-    print("--- Running FairWalk (Group Fairness) ---")
+    # --- Run 2: FairWalk ---
+    print(f"--- Running FairWalk (num_walks={NUM_WALKS}) ---")
     fairwalk_model = FairWalk()
     fairwalk_model.fit(adj=adj, labels=labels, idx_train=idx_train, sens=sens,
-                       dimensions=64, num_walks=10, walk_length=20, workers=4)
+                       dimensions=DIMS, num_walks=NUM_WALKS, walk_length=WALK_LENGTH, workers=4)
     (ACC, AUCROC, F1, _, _, _, _, _, _, SP, EO) = fairwalk_model.predict(idx_test, idx_val)
     if_score = calculate_individual_fairness(fairwalk_model.embs, feats_np)
     results.append({
@@ -83,12 +88,11 @@ if __name__ == "__main__":
     })
     print("--- FairWalk Complete ---\n")
 
-
-    # --- Run 3: FeatWalk (Individual Fairness) ---
-    print("--- Running FeatWalk (Individual Fairness) ---")
+    # --- Run 3: FeatWalk ---
+    print(f"--- Running FeatWalk (num_walks={NUM_WALKS}) ---")
     featwalk_model = FeatWalk()
     featwalk_model.fit(adj_matrix=adj, feats=feats, labels=labels, idx_train=idx_train, sens=sens,
-                       representation_size=64, number_walks=10, walk_length=20, alpha=5.0)
+                       representation_size=DIMS, number_walks=NUM_WALKS, walk_length=WALK_LENGTH, alpha=ALPHA)
     (ACC, AUCROC, F1, _, _, _, _, _, _, SP, EO) = featwalk_model.predict(idx_test)
     if_score = calculate_individual_fairness(featwalk_model.embs, feats_np)
     results.append({
@@ -97,19 +101,13 @@ if __name__ == "__main__":
     })
     print("--- FeatWalk Complete ---\n")
 
-
     # --- 4. Final Comparison Summary ---
     print("==========================================================")
     print("                 Algorithm Comparison")
     print("==========================================================")
-    
-    # You may need to run 'pip install pandas' for this table.
     df = pd.DataFrame(results)
-    df = df.set_index("Algorithm") # Set the Algorithm column as the index
-    
-    # Format the numbers for better readability
+    df = df.set_index("Algorithm")
     pd.options.display.float_format = '{:.4f}'.format
-    
     print(df)
     print("\n* Individual Fairness Score: Lower is better.")
     print("* SP and EO: Values closer to 0.0 are better.")

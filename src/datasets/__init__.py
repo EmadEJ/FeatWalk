@@ -9,4 +9,5 @@ __all__ = [
     'Bail', 
     'Credit',
     'Oklahoma',
+    'German',
 ]

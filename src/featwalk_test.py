@@ -3,7 +3,7 @@
 import torch
 import numpy as np
 import random
-from debiasing.FeatWalk import FeatWalk
+from algorithms.FeatWalk import FeatWalk
 from datasets import Nba
 from sklearn.metrics.pairwise import cosine_similarity
 
@@ -56,7 +56,7 @@ model.fit(adj_matrix=adj,
           walk_length=20,
           number_walks=10,
           representation_size=64,
-          alpha=5.0) # <-- Try tuning this value (e.g., 1.0, 5.0, 10.0)
+          alpha=5.0)
 print("Training complete.")
 
 print("\nEvaluating model on the test set...")

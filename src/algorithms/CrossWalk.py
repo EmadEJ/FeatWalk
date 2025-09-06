@@ -505,11 +505,12 @@ class CrossWalk:
         adj_matrix,
         number_walks=5,
         representation_size=64,
-        seed=0,
+        seed=42,
         walk_length=20,
         window_size=5,
         workers=1,
         pmodified=1.0,
+        sens=None,
     ):
         self.number_walks = int(number_walks)
         # parser.add_argument('--number-walks', default=5, type=int,
@@ -531,10 +532,12 @@ class CrossWalk:
         #                    help='Number of parallel processes.')
         self.pmodified = pmodified
         # parser.add_argument('--pmodified', default=1.0, type=float, help='Probability of using the modified graph')
-        return self.process(adj_matrix)
+        return self.process(adj_matrix, sens)
 
-    def process(self, adj_matrix):
+    def process(self, adj_matrix, sens):
         G = from_numpy(sp.coo_matrix(adj_matrix.to_dense().numpy()), undirected=True)
+        G.attr = {i: s.item() for i, s in enumerate(sens)}
+        G.edge_weights = 'smartshortcut_0.8' 
         num_walks = len(G.nodes()) * self.number_walks
         print("Number of walks: {}".format(num_walks))
         data_size = num_walks * self.walk_length
@@ -558,6 +561,7 @@ class CrossWalk:
             sg=1,
             hs=1,
             workers=self.workers,
+            seed=self.seed,
         )
 
         return model.wv.vectors
@@ -717,7 +721,7 @@ class CrossWalk:
         workers=5,
         pmodified=1.0,
     ):
-        self.embs=self.run(adj_matrix, number_walks, representation_size, seed, walk_length, window_size, workers, pmodified)
+        self.embs=self.run(adj_matrix, number_walks, representation_size, seed, walk_length, window_size, workers, pmodified, sens)
 
         # from torch_geometric.utils import from_scipy_sparse_matrix
 
@@ -820,16 +824,27 @@ class CrossWalk:
             # print("train acc", ACC)
 
     def fair_metric(self, pred, labels, sens):
-        idx_s0 = sens == 0
-        idx_s1 = sens == 1
+        idx_s0 = (sens == 0)
+        idx_s1 = (sens == 1)
+        
+        # Get the members of the positive class for each group
         idx_s0_y1 = np.bitwise_and(idx_s0, labels == 1)
         idx_s1_y1 = np.bitwise_and(idx_s1, labels == 1)
+
+        # Calculate True Positive Rates safely, checking for zero denominators
+        tpr_s0 = sum(pred[idx_s0_y1]) / sum(idx_s0_y1) if sum(idx_s0_y1) > 0 else 0
+        tpr_s1 = sum(pred[idx_s1_y1]) / sum(idx_s1_y1) if sum(idx_s1_y1) > 0 else 0
+        
+        equality = abs(tpr_s0 - tpr_s1)
+        
+        # The parity calculation is usually safe but can be protected as well
         parity = abs(sum(pred[idx_s0]) / sum(idx_s0) - sum(pred[idx_s1]) / sum(idx_s1))
-        equality = abs(
-            sum(pred[idx_s0_y1]) / sum(idx_s0_y1)
-            - sum(pred[idx_s1_y1]) / sum(idx_s1_y1)
-        )
-        return parity.item(), equality.item()
+
+        # Convert to standard Python float if they are tensor scalars
+        if hasattr(parity, 'item'): parity = parity.item()
+        if hasattr(equality, 'item'): equality = equality.item()
+            
+        return parity, equality
 
     def predict(self, idx_test, idx_val):
         return self.classify(idx_test, idx_val)

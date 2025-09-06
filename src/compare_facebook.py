@@ -1,4 +1,4 @@
-# compare_algorithms_facebook.py
+# compare_facebook_stable.py
 
 import torch
 import numpy as np
@@ -7,9 +7,9 @@ import pandas as pd
 from sklearn.metrics.pairwise import cosine_similarity
 
 # Import all three of your algorithms and the Facebook dataset
-from debiasing.CrossWalk import CrossWalk
-from debiasing.FairWalk import FairWalk
-from debiasing.FeatWalk import FeatWalk
+from algorithms.CrossWalk import CrossWalk
+from algorithms.FairWalk import FairWalk
+from algorithms.FeatWalk import FeatWalk
 from datasets import Facebook
 
 # -- Helper Functions --
@@ -39,6 +39,12 @@ def calculate_individual_fairness(embeddings, features):
 if __name__ == "__main__":
     setup_seed(42)
 
+    # --- Hyperparameters for Consistency ---
+    NUM_WALKS = 40      # Increased for more stable embeddings
+    WALK_LENGTH = 20
+    DIMS = 64
+    ALPHA = 1.0         # Using the best value from NBA tuning as a starting point
+
     # 1. Load the Facebook dataset
     print("Loading Facebook dataset...")
     facebook = Facebook()
@@ -57,10 +63,10 @@ if __name__ == "__main__":
     results = []
 
     # --- Run 1: CrossWalk (Baseline) ---
-    print("--- Running CrossWalk (Baseline) ---")
+    print(f"--- Running CrossWalk (num_walks={NUM_WALKS}) ---")
     crosswalk_model = CrossWalk()
     crosswalk_model.fit(adj_matrix=adj, feats=feats, labels=labels, idx_train=idx_train, sens=sens,
-                        representation_size=64, number_walks=10, walk_length=20)
+                        representation_size=DIMS, number_walks=NUM_WALKS, walk_length=WALK_LENGTH)
     (ACC, AUCROC, F1, _, _, _, _, _, _, SP, EO) = crosswalk_model.predict(idx_test, idx_val)
     if_score_cw = calculate_individual_fairness(crosswalk_model.embs, feats_np)
     results.append({
@@ -70,10 +76,10 @@ if __name__ == "__main__":
     print("--- CrossWalk Complete ---\n")
 
     # --- Run 2: FairWalk (Group Fairness Baseline) ---
-    print("--- Running FairWalk (Group Fairness) ---")
+    print(f"--- Running FairWalk (num_walks={NUM_WALKS}) ---")
     fairwalk_model = FairWalk()
     fairwalk_model.fit(adj=adj, labels=labels, idx_train=idx_train, sens=sens,
-                       dimensions=64, num_walks=10, walk_length=20, workers=4)
+                       dimensions=DIMS, num_walks=NUM_WALKS, walk_length=WALK_LENGTH, workers=4)
     (ACC, AUCROC, F1, _, _, _, _, _, _, SP, EO) = fairwalk_model.predict(idx_test, idx_val)
     if_score_fw = calculate_individual_fairness(fairwalk_model.embs, feats_np)
     results.append({
@@ -83,10 +89,10 @@ if __name__ == "__main__":
     print("--- FairWalk Complete ---\n")
 
     # --- Run 3: FeatWalk (Individual Fairness) ---
-    print("--- Running FeatWalk (Individual Fairness) ---")
+    print(f"--- Running FeatWalk (num_walks={NUM_WALKS}) ---")
     featwalk_model = FeatWalk()
     featwalk_model.fit(adj_matrix=adj, feats=feats, labels=labels, idx_train=idx_train, sens=sens,
-                       representation_size=64, number_walks=10, walk_length=20, alpha=5.0)
+                       representation_size=DIMS, number_walks=NUM_WALKS, walk_length=WALK_LENGTH, alpha=ALPHA)
     (ACC, AUCROC, F1, _, _, _, _, _, _, SP, EO) = featwalk_model.predict(idx_test)
     if_score_ftw = calculate_individual_fairness(featwalk_model.embs, feats_np)
     results.append({
@@ -100,7 +106,6 @@ if __name__ == "__main__":
     print("       Algorithm Comparison on Facebook Dataset")
     print("==========================================================")
     
-    # You may need to run 'pip install pandas' for this table.
     df = pd.DataFrame(results)
     df = df.set_index("Algorithm")
     
