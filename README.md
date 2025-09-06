@@ -23,8 +23,8 @@ Follow these steps to set up the project on your local machine.
 
 #### 1. Clone the Repository
 ```bash
-git clone [https://github.com/EmadEJ/fair_graph_embedding.git](https://github.com/EmadEJ/fair_graph_embedding.git)
-cd fair_graph_embedding
+git clone [https://github.com/EmadEJ/fair_graph_embedding.git](https://github.com/EmadEJ/FeatWalk.git)
+cd FeatWalk
 ```
 
 #### 2. Create and Activate a Virtual Environment
