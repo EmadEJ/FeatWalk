@@ -42,13 +42,8 @@ source .venv/bin/activate
 ```
 
 #### 3. Install Dependencies
-With the environment active, install the project in editable mode along with its dependencies. This command includes the necessary links to find compatible versions of PyTorch and its related libraries.
 
 ```bash
-# Upgrade pip and install pandas for results tables
-pip install --upgrade pip
-pip install pandas
-
 # Install the project and its core dependencies
 pip install -r requirements.txt
 ```
@@ -60,6 +55,9 @@ pip install -r requirements.txt
 You can run the full comparison between `CrossWalk`, `FairWalk`, and `FeatWalk` on different datasets using the provided scripts.
 
 ```bash
+# Enter the source code directory
+cd src
+
 # Example: Run the stable comparison on the Facebook dataset
 python compare_facebook.py
 
